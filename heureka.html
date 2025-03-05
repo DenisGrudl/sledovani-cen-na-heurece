@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sledování cen na Heurece - Verze 1.0</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        .manufacturer {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .product-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .product-list li {
+            margin: 10px 0;
+        }
+        .product-link {
+            color: #0000EE;
+            text-decoration: none;
+        }
+        .product-details {
+            padding: 10px;
+            background-color: #f9f9f9;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sledování cen na Heurece - Verze 1.0</h1>
+    <input type="file" id="fileInput" accept=".xml">
+    
+    <div id="manufacturerSelectWrapper" style="display: none;">
+        <label for="manufacturerSelect">Choose Manufacturer: </label>
+        <select id="manufacturerSelect">
+            <option value="">Select Manufacturer</option>
+        </select>
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                alert("Please select a file!");
+                return;
+            }
+
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(e.target.result, "application/xml");
+
+                    // Check if there is any error in the XML parsing
+                    const parseError = xmlDoc.getElementsByTagName("parsererror");
+                    if (parseError.length) {
+                        alert("Error in XML format!");
+                        return;
+                    }
+
+                    const products = xmlDoc.getElementsByTagName("PRODUCT");
+                    const manufacturers = {};
+
+                    // Process each product
+                    Array.from(products).forEach(product => {
+                        const manufacturerNode = product.getElementsByTagName("manufacturer")[0];
+                        const productNameNode = product.getElementsByTagName("product")[0];
+                        const productIdNode = product.getElementsByTagName("itemId")[0];
+                        const myPriceNode = product.getElementsByTagName("myPrice")[0];
+                        const minPrice1Node = product.getElementsByTagName("minPrice1")[0];
+                        const urlNode = product.getElementsByTagName("url")[0];
+                        const heurekaUrlNode = product.getElementsByTagName("heurekaUrl")[0];
+                        const popularityNode = product.getElementsByTagName("popularity")[0];
+                        const positionNode = product.getElementsByTagName("position")[0];
+                        const priceHistory = [];
+
+                        // Ensure nodes are present before accessing their content
+                        const manufacturer = manufacturerNode ? manufacturerNode.textContent : '';
+                        const productName = productNameNode ? productNameNode.textContent : '';
+                        const productId = productIdNode ? productIdNode.textContent : '';
+                        const myPrice = myPriceNode ? parseFloat(myPriceNode.textContent) : null;
+                        const minPrice1 = minPrice1Node ? parseFloat(minPrice1Node.textContent) : null;
+                        const url = urlNode ? urlNode.textContent : '';
+                        const heurekaUrl = heurekaUrlNode ? heurekaUrlNode.textContent : '';
+                        const popularity = popularityNode ? parseInt(popularityNode.textContent) : 0;
+                        const position = positionNode ? parseInt(positionNode.textContent) : 0;
+
+                        // Collecting price history
+                        for (let i = 1; i <= 10; i++) {
+                            const priceNode = product.getElementsByTagName(`minPrice${i}`)[0];
+                            if (priceNode) {
+                                priceHistory.push(parseFloat(priceNode.textContent));
+                            }
+                        }
+
+                        // Skip products where myPrice is the lowest price
+                        if (!manufacturer || !productName || !productId || !url || !heurekaUrl) return;
+
+                        // Group products by manufacturer
+                        if (!manufacturers[manufacturer]) {
+                            manufacturers[manufacturer] = { 
+                                products: [], 
+                                lowestPriceCount: 0 
+                            };
+                        }
+
+                        manufacturers[manufacturer].products.push({
+                            productName,
+                            productId,
+                            url,
+                            heurekaUrl,
+                            popularity,
+                            position,
+                            myPrice,
+                            priceHistory,
+                            minPrice1
+                        });
+
+                        // Count the lowest price before filtering
+                        if (myPrice === minPrice1) {
+                            manufacturers[manufacturer].lowestPriceCount++;
+                        }
+                    });
+
+                    // Sort manufacturers alphabetically ignoring case
+                    const sortedManufacturers = Object.keys(manufacturers).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+                    // Display manufacturer selection
+                    const manufacturerSelect = document.getElementById('manufacturerSelect');
+                    manufacturerSelect.innerHTML = '<option value="">Select Manufacturer</option>';
+                    sortedManufacturers.forEach(manufacturer => {
+                        const option = document.createElement('option');
+                        option.value = manufacturer;
+                        option.textContent = manufacturer;
+                        manufacturerSelect.appendChild(option);
+                    });
+
+                    // Show manufacturer select dropdown
+                    document.getElementById('manufacturerSelectWrapper').style.display = 'block';
+
+                    // Event listener for manufacturer selection
+                    manufacturerSelect.addEventListener('change', function() {
+                        const selectedManufacturer = manufacturerSelect.value;
+                        displayManufacturerProducts(manufacturers, selectedManufacturer);
+                    });
+
+                } catch (error) {
+                    alert("Error processing the file: " + error.message);
+                }
+            };
+
+            if (file) {
+                reader.readAsText(file);
+            }
+        });
+
+        function displayManufacturerProducts(manufacturers, manufacturer) {
+            const products = manufacturers[manufacturer].products;
+
+            // Sort products by popularity (highest first)
+            products.sort((a, b) => b.popularity - a.popularity);
+
+            let outputHTML = `<h2>Products by ${manufacturer} (${products.length} products) - ${manufacturers[manufacturer].lowestPriceCount} lowest price(s)</h2><ul class="product-list">`;
+
+            products.forEach(product => {
+                outputHTML += `<li>
+                    <p><strong>${product.productName}</strong></p>
+                    <div class="product-details">
+                        <p><strong>Price:</strong> ${product.myPrice} CZK</p>
+                        <p><strong>Popularity:</strong> ${product.popularity}</p>
+                        <p><strong>Position:</strong> ${product.position}</p>
+                        <p><strong>Current Prices:</strong> ${product.priceHistory.join(', ')}</p>
+                        <p><a href="${product.heurekaUrl}" target="_blank">View on Heureka</a></p>
+                        <p><a href="https://admin.vitalita.cz/products/variant/edit/${product.productId}" target="_blank">Edit in Admin</a></p>
+                    </div>
+                </li>`;
+            });
+
+            outputHTML += '</ul>';
+            document.getElementById('output').innerHTML = outputHTML;
+        }
+    </script>
+</body>
+</html>
