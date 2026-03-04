@@ -124,6 +124,74 @@
       font-size: 18px;
       color: #e94560;
     }
+
+    .mobile-controls {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .mobile-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .mobile-btn {
+      background: #16213e;
+      border: 2px solid #0f3460;
+      border-radius: 8px;
+      color: #eee;
+      font-size: 22px;
+      width: 60px;
+      height: 60px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s;
+    }
+
+    .mobile-btn:active {
+      background: #e94560;
+    }
+
+    .mobile-btn.wide {
+      width: 130px;
+    }
+
+    @media (max-width: 700px) {
+      .game-wrapper {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .side-panel {
+        flex-direction: row;
+        width: auto;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .side-panel:last-child {
+        display: none;
+      }
+
+      .mobile-controls {
+        display: flex;
+      }
+
+      canvas#game-canvas {
+        width: 270px;
+        height: 540px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -150,7 +218,22 @@
     </div>
   </div>
 
-  <canvas id="game-canvas" width="300" height="600"></canvas>
+  <div style="display:flex;flex-direction:column;align-items:center;">
+    <canvas id="game-canvas" width="300" height="600"></canvas>
+    <div class="mobile-controls">
+      <div class="mobile-row">
+        <button class="mobile-btn" id="btn-rotate">↑</button>
+      </div>
+      <div class="mobile-row">
+        <button class="mobile-btn" id="btn-left">←</button>
+        <button class="mobile-btn" id="btn-down">↓</button>
+        <button class="mobile-btn" id="btn-right">→</button>
+      </div>
+      <div class="mobile-row">
+        <button class="mobile-btn wide" id="btn-drop">⬇ Pád</button>
+      </div>
+    </div>
+  </div>
 
   <div class="side-panel">
     <div class="panel-box">
@@ -409,6 +492,49 @@
   }
 
   document.getElementById('start-btn').addEventListener('click', startGame);
+
+  // Mobile buttons
+  function doLeft() { if (!paused && !gameOver && piece) { if (isValid(piece.shape, piece.x - 1, piece.y)) piece.x--; } }
+  function doRight() { if (!paused && !gameOver && piece) { if (isValid(piece.shape, piece.x + 1, piece.y)) piece.x++; } }
+  function doDown() { if (!paused && !gameOver && piece) { drop(); score++; updateUI(); lastTime = performance.now(); } }
+  function doRotate() {
+    if (!paused && !gameOver && piece) {
+      const rotated = rotate(piece.shape);
+      if (isValid(rotated, piece.x, piece.y)) piece.shape = rotated;
+      else if (isValid(rotated, piece.x - 1, piece.y)) { piece.shape = rotated; piece.x--; }
+      else if (isValid(rotated, piece.x + 1, piece.y)) { piece.shape = rotated; piece.x++; }
+    }
+  }
+  function doDrop() { if (!paused && !gameOver && piece) hardDrop(); }
+
+  document.getElementById('btn-left').addEventListener('click', doLeft);
+  document.getElementById('btn-right').addEventListener('click', doRight);
+  document.getElementById('btn-down').addEventListener('click', doDown);
+  document.getElementById('btn-rotate').addEventListener('click', doRotate);
+  document.getElementById('btn-drop').addEventListener('click', doDrop);
+
+  // Swipe gesture support
+  let touchStartX = 0, touchStartY = 0;
+  canvas.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    if (absDx < 10 && absDy < 10) {
+      doRotate();
+    } else if (absDx > absDy) {
+      if (dx > 0) doRight(); else doLeft();
+    } else {
+      if (dy > 0) doDrop(); else doRotate();
+    }
+    e.preventDefault();
+  }, { passive: false });
 
   document.addEventListener('keydown', e => {
     if (gameOver) return;
