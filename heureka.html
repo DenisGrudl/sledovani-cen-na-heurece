@@ -37,6 +37,13 @@
             border: 1px solid #ddd;
             border-radius: 5px;
         }
+        .product-details.dimmed {
+            opacity: 0.4;
+        }
+        .product-details.cheapest {
+            background-color: #e8f5e9;
+            border-color: #a5d6a7;
+        }
     </style>
 </head>
 <body>
@@ -170,30 +177,63 @@
             }
         });
 
+        function getNotifyEqual(productId) {
+            return localStorage.getItem('notify_equal_' + productId) === 'true';
+        }
+
+        function setNotifyEqual(productId, value) {
+            localStorage.setItem('notify_equal_' + productId, value);
+        }
+
+        function getProductClass(product) {
+            if (product.myPrice !== null && product.minPrice1 !== null) {
+                if (product.myPrice < product.minPrice1) return 'cheapest';
+                if (product.myPrice === product.minPrice1 && !getNotifyEqual(product.productId)) return 'dimmed';
+            }
+            return '';
+        }
+
         function displayManufacturerProducts(manufacturers, manufacturer) {
             const products = manufacturers[manufacturer].products;
 
             // Sort products by popularity (highest first)
             products.sort((a, b) => b.popularity - a.popularity);
 
-            let outputHTML = `<h2>Products by ${manufacturer} (${products.length} products) - ${manufacturers[manufacturer].lowestPriceCount} lowest price(s)</h2><ul class="product-list">`;
+            let outputHTML = `<h2>Produkty ${manufacturer} (${products.length} ks) - ${manufacturers[manufacturer].lowestPriceCount} nejnižší cena/y</h2><ul class="product-list">`;
 
             products.forEach(product => {
+                const notifyEqual = getNotifyEqual(product.productId);
+                const detailClass = getProductClass(product);
                 outputHTML += `<li>
                     <p><strong>${product.productName}</strong></p>
-                    <div class="product-details">
-                        <p><strong>Price:</strong> ${product.myPrice} CZK</p>
-                        <p><strong>Popularity:</strong> ${product.popularity}</p>
-                        <p><strong>Position:</strong> ${product.position}</p>
-                        <p><strong>Current Prices:</strong> ${product.priceHistory.join(', ')}</p>
-                        <p><a href="${product.heurekaUrl}" target="_blank">View on Heureka</a></p>
-                        <p><a href="https://admin.vitalita.cz/products/variant/edit/${product.productId}" target="_blank">Edit in Admin</a></p>
+                    <div class="product-details ${detailClass}" id="details-${product.productId}">
+                        <p><strong>Cena:</strong> ${product.myPrice} Kč &nbsp; <strong>Min. konkurence:</strong> ${product.minPrice1 !== null ? product.minPrice1 + ' Kč' : '—'}</p>
+                        <p><strong>Oblíbenost:</strong> ${product.popularity} &nbsp; <strong>Pozice:</strong> ${product.position}</p>
+                        <p><strong>Historie cen:</strong> ${product.priceHistory.join(', ')}</p>
+                        <p>
+                            <label>
+                                <input type="checkbox" class="notify-equal-cb" data-id="${product.productId}" ${notifyEqual ? 'checked' : ''}>
+                                Hlídat i při totožné ceně
+                            </label>
+                        </p>
+                        <p><a href="${product.heurekaUrl}" target="_blank">Zobrazit na Heurece</a> &nbsp; <a href="https://admin.vitalita.cz/products/variant/edit/${product.productId}" target="_blank">Upravit v adminu</a></p>
                     </div>
                 </li>`;
             });
 
             outputHTML += '</ul>';
-            document.getElementById('output').innerHTML = outputHTML;
+            const output = document.getElementById('output');
+            output.innerHTML = outputHTML;
+
+            output.querySelectorAll('.notify-equal-cb').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const id = this.dataset.id;
+                    setNotifyEqual(id, this.checked);
+                    const product = products.find(p => p.productId === id);
+                    const details = document.getElementById('details-' + id);
+                    details.className = 'product-details ' + getProductClass(product);
+                });
+            });
         }
     </script>
 </body>
