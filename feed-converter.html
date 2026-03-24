@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feed Converter – Návrh</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            color: #222;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        header {
+            background: #1a6fc4;
+            color: #fff;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        header h1 { font-size: 1.2rem; font-weight: bold; }
+        header span { font-size: .85rem; opacity: .75; }
+
+        /* ── Stepper ── */
+        .stepper {
+            display: flex;
+            background: #fff;
+            border-bottom: 1px solid #dde2ea;
+            padding: 0 24px;
+            gap: 0;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 24px 16px 0;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: .9rem;
+            color: #888;
+            user-select: none;
+            transition: color .15s, border-color .15s;
+        }
+        .step.active   { color: #1a6fc4; border-color: #1a6fc4; }
+        .step.done     { color: #27ae60; }
+        .step-num {
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            background: #e0e7ef;
+            color: #555;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .8rem; font-weight: bold;
+            flex-shrink: 0;
+        }
+        .step.active .step-num { background: #1a6fc4; color: #fff; }
+        .step.done   .step-num { background: #27ae60; color: #fff; }
+
+        /* ── Layout ── */
+        main {
+            max-width: 1100px;
+            margin: 28px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #dde2ea;
+            border-radius: 8px;
+            padding: 28px 32px;
+        }
+        .card h2 { font-size: 1.05rem; margin-bottom: 6px; }
+        .card .subtitle { font-size: .85rem; color: #666; margin-bottom: 20px; }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 18px; border-radius: 5px;
+            border: none; cursor: pointer; font-size: .9rem;
+            font-weight: 600; transition: background .15s;
+        }
+        .btn-primary  { background: #1a6fc4; color: #fff; }
+        .btn-primary:hover  { background: #155da0; }
+        .btn-secondary { background: #e8edf4; color: #333; }
+        .btn-secondary:hover { background: #d4dce9; }
+        .btn-success  { background: #27ae60; color: #fff; }
+        .btn-success:hover  { background: #1e8c4d; }
+        .btn-sm { padding: 5px 12px; font-size: .82rem; }
+
+        .actions {
+            display: flex; gap: 10px; margin-top: 28px;
+            justify-content: flex-end;
+        }
+
+        /* ── Step 1 – Upload ── */
+        .upload-zone {
+            border: 2px dashed #b0bec5;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+            background: #fafcff;
+        }
+        .upload-zone:hover { border-color: #1a6fc4; background: #f0f5ff; }
+        .upload-zone.dragover { border-color: #1a6fc4; background: #e8f0fe; }
+        .upload-zone .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .upload-zone p { color: #555; font-size: .9rem; }
+        .upload-zone small { color: #999; }
+        #fileInput { display: none; }
+
+        .format-pills {
+            display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap;
+        }
+        .pill {
+            padding: 4px 12px; border-radius: 20px;
+            background: #e8edf4; font-size: .8rem; color: #444;
+        }
+
+        .file-info {
+            display: none;
+            margin-top: 16px;
+            background: #f0f7ee;
+            border: 1px solid #b9dbb0;
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: .88rem;
+            color: #2e7d32;
+            gap: 10px;
+            align-items: center;
+        }
+        .file-info.show { display: flex; }
+
+        /* ── Step 2 – Mapping ── */
+        .mapping-grid {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 12px;
+            align-items: center;
+        }
+        .mapping-grid .col-header {
+            font-size: .78rem; font-weight: bold; text-transform: uppercase;
+            color: #888; letter-spacing: .05em; padding-bottom: 4px;
+            border-bottom: 1px solid #dde2ea;
+        }
+        .mapping-grid .arrow { text-align: center; color: #999; font-size: 1.1rem; }
+        .mapping-row {
+            display: contents;
+        }
+        .mapping-row .db-field {
+            background: #f0f5ff;
+            border: 1px solid #c5d8f5;
+            border-radius: 5px;
+            padding: 8px 12px;
+            font-size: .88rem;
+        }
+        .db-field .required { color: #e74c3c; font-size: .75rem; margin-left: 4px; }
+        .db-field .type { color: #999; font-size: .75rem; }
+        .feed-select {
+            width: 100%;
+            padding: 7px 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: .88rem;
+            background: #fff;
+        }
+        .feed-select.mapped { border-color: #27ae60; background: #f0fff4; }
+        .feed-select.ignored { background: #fafafa; color: #aaa; }
+
+        .mapping-note {
+            margin-top: 14px;
+            font-size: .82rem; color: #666;
+            background: #fffde7; border: 1px solid #ffe082;
+            border-radius: 5px; padding: 8px 12px;
+        }
+
+        /* ── Step 3 – Product selection ── */
+        .filter-bar {
+            display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-bar input[type="text"] {
+            flex: 1; min-width: 180px;
+            padding: 8px 12px; border: 1px solid #ccc; border-radius: 5px; font-size: .88rem;
+        }
+        .filter-bar select {
+            padding: 8px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: .88rem;
+        }
+
+        .product-table-wrap { overflow-x: auto; }
+        table {
+            width: 100%; border-collapse: collapse; font-size: .86rem;
+        }
+        th {
+            background: #f0f4f8; text-align: left;
+            padding: 9px 12px; border-bottom: 2px solid #dde2ea;
+            font-size: .78rem; text-transform: uppercase; color: #666;
+            white-space: nowrap;
+        }
+        td { padding: 9px 12px; border-bottom: 1px solid #eef0f3; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr.selected td { background: #f0f7ff; }
+        tr:hover td { background: #f8fafc; }
+        tr.selected:hover td { background: #e8f0ff; }
+
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 12px;
+            font-size: .75rem; font-weight: 600;
+        }
+        .badge-green { background: #e8f5e9; color: #27ae60; }
+        .badge-orange { background: #fff3e0; color: #e67e22; }
+        .badge-red { background: #fce4ec; color: #c0392b; }
+        .badge-gray { background: #f0f0f0; color: #888; }
+
+        .select-info {
+            font-size: .85rem; color: #555; margin-top: 10px;
+        }
+        .select-info strong { color: #1a6fc4; }
+
+        /* ── Step 4 – Review ── */
+        .review-list { display: flex; flex-direction: column; gap: 20px; }
+        .review-item {
+            border: 1px solid #dde2ea;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .review-item-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px;
+            background: #f8f9fb;
+            border-bottom: 1px solid #dde2ea;
+            cursor: pointer;
+        }
+        .review-item-header .item-name { font-weight: 600; font-size: .95rem; flex: 1; }
+        .review-item-body { padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        .field-group label {
+            display: block; font-size: .75rem; color: #888; margin-bottom: 3px;
+            text-transform: uppercase; letter-spacing: .04em;
+        }
+        .field-group input, .field-group select, .field-group textarea {
+            width: 100%; padding: 7px 10px;
+            border: 1px solid #ccc; border-radius: 5px; font-size: .88rem;
+            background: #fff;
+        }
+        .field-group input.missing, .field-group textarea.missing {
+            border-color: #e74c3c; background: #fff5f5;
+        }
+        .field-group input.prefilled {
+            background: #f0fff4; border-color: #a5d6a7;
+        }
+        .field-group textarea { resize: vertical; min-height: 60px; }
+        .field-group.full { grid-column: 1 / -1; }
+
+        .validation-msg { font-size: .78rem; color: #e74c3c; margin-top: 3px; }
+
+        /* ── Summary bar ── */
+        .summary-bar {
+            display: flex; gap: 24px;
+            background: #fff; border: 1px solid #dde2ea;
+            border-radius: 8px; padding: 16px 24px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .summary-stat { text-align: center; }
+        .summary-stat .val { font-size: 1.6rem; font-weight: bold; color: #1a6fc4; }
+        .summary-stat .lbl { font-size: .78rem; color: #888; }
+
+        /* ── Responsive ── */
+        @media (max-width: 680px) {
+            .mapping-grid { grid-template-columns: 1fr; }
+            .mapping-grid .arrow { display: none; }
+            .review-item-body { grid-template-columns: 1fr; }
+        }
+
+        /* ── Hidden utility ── */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>Feed Converter</h1>
+        <span>Převod přípravků z feedu do databáze</span>
+    </div>
+</header>
+
+<!-- Stepper -->
+<div class="stepper">
+    <div class="step active" data-step="1">
+        <div class="step-num">1</div> Nahrání feedu
+    </div>
+    <div class="step" data-step="2">
+        <div class="step-num">2</div> Mapování polí
+    </div>
+    <div class="step" data-step="3">
+        <div class="step-num">3</div> Výběr přípravků
+    </div>
+    <div class="step" data-step="4">
+        <div class="step-num">4</div> Kontrola a uložení
+    </div>
+</div>
+
+<main>
+
+<!-- ══════════════════════════════════════════
+     STEP 1 – Nahrání feedu
+══════════════════════════════════════════ -->
+<div id="step1" class="card">
+    <h2>Nahrání feedu</h2>
+    <p class="subtitle">Nahrajte soubor s přípravky. Podporované formáty: XML (Heureka), CSV, JSON.</p>
+
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+        <div class="icon">📂</div>
+        <p><strong>Klikněte pro výběr souboru</strong> nebo přetáhněte sem</p>
+        <small>XML · CSV · JSON · max. 50 MB</small>
+    </div>
+    <input type="file" id="fileInput" accept=".xml,.csv,.json">
+
+    <div class="format-pills">
+        <div class="pill">XML – Heureka formát</div>
+        <div class="pill">CSV s hlavičkou</div>
+        <div class="pill">JSON pole objektů</div>
+    </div>
+
+    <div class="file-info" id="fileInfo">
+        ✅ <span id="fileInfoText">soubor.xml – 1 234 přípravků nalezeno</span>
+    </div>
+
+    <!-- Ukázka detekovaných polí -->
+    <div id="feedPreview" class="hidden" style="margin-top:22px;">
+        <div style="font-size:.82rem;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:8px;">
+            Detekovaná pole ve feedu
+        </div>
+        <div id="detectedFields" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+
+        <div style="margin-top:18px;font-size:.82rem;font-weight:bold;text-transform:uppercase;color:#888;margin-bottom:8px;">
+            Náhled prvních 3 přípravků
+        </div>
+        <div class="product-table-wrap">
+            <table id="previewTable">
+                <thead><tr id="previewHead"></tr></thead>
+                <tbody id="previewBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="btn btn-primary" id="btn1Next" disabled onclick="goStep(2)">
+            Pokračovat →
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     STEP 2 – Mapování polí
+══════════════════════════════════════════ -->
+<div id="step2" class="card hidden">
+    <h2>Mapování polí</h2>
+    <p class="subtitle">
+        Přiřaďte pole z feedu k polím v databázi. Pole označená
+        <span style="color:#e74c3c">*</span> jsou povinná.
+    </p>
+
+    <div class="mapping-grid">
+        <!-- Hlavičky -->
+        <div class="col-header">Pole v databázi</div>
+        <div class="arrow"></div>
+        <div class="col-header">Pole ve feedu</div>
+
+        <!-- Řádky mapování -->
+        <div class="mapping-row">
+            <div class="db-field">Název <span class="required">*</span><span class="type"> · text</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select mapped"><option>PRODUCT_NAME</option></select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">Popis <span class="type"> · text</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select mapped"><option>DESCRIPTION</option></select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">Kategorie <span class="required">*</span><span class="type"> · text</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select">
+                <option value="">– nevybráno –</option>
+                <option>CATEGORY_TEXT</option>
+                <option>CATEGORYTEXT</option>
+                <option>ITEM_TYPE</option>
+            </select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">Výrobce <span class="type"> · text</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select mapped"><option>MANUFACTURER</option></select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">EAN <span class="type"> · číslo</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select mapped"><option>EAN</option></select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">Cena nákupní <span class="required">*</span><span class="type"> · číslo</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select">
+                <option value="">– nevybráno –</option>
+                <option>PRICE_BUY</option>
+                <option>PRICE</option>
+                <option>PURCHASE_PRICE</option>
+            </select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">Cena prodejní <span class="required">*</span><span class="type"> · číslo</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select mapped"><option>PRICE</option></select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">URL obrázku <span class="type"> · text</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select mapped"><option>IMGURL</option></select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">URL produktu <span class="type"> · text</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select mapped"><option>URL</option></select>
+        </div>
+
+        <div class="mapping-row">
+            <div class="db-field">Dostupnost <span class="type"> · text</span></div>
+            <div class="arrow">→</div>
+            <select class="feed-select ignored">
+                <option value="">– ignorovat –</option>
+                <option>DELIVERY_DATE</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="mapping-note">
+        💡 Pole označená <em>– nevybráno –</em> se při importu ignorují. Lze je doplnit ručně v kroku 4.
+    </div>
+
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm">💾 Uložit profil mapování</button>
+        <button class="btn btn-secondary btn-sm">📂 Načíst profil</button>
+    </div>
+
+    <div class="actions">
+        <button class="btn btn-secondary" onclick="goStep(1)">← Zpět</button>
+        <button class="btn btn-primary" onclick="goStep(3)">Pokračovat →</button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     STEP 3 – Výběr přípravků
+══════════════════════════════════════════ -->
+<div id="step3" class="card hidden">
+    <h2>Výběr přípravků</h2>
+    <p class="subtitle">Vyberte přípravky, které chcete převést do databáze.</p>
+
+    <div class="filter-bar">
+        <input type="text" placeholder="Hledat název / EAN / výrobce…">
+        <select>
+            <option value="">Všechny kategorie</option>
+            <option>Vitamíny</option>
+            <option>Minerály</option>
+            <option>Proteinové doplňky</option>
+        </select>
+        <select>
+            <option value="">Všichni výrobci</option>
+            <option>Pharmavit</option>
+            <option>Biomin</option>
+            <option>GreenFood</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="toggleSelectAll()">Vybrat vše</button>
+    </div>
+
+    <div class="product-table-wrap">
+        <table id="productTable">
+            <thead>
+                <tr>
+                    <th style="width:36px"><input type="checkbox" id="chkAll" onchange="toggleSelectAll()"></th>
+                    <th>Název</th>
+                    <th>EAN</th>
+                    <th>Výrobce</th>
+                    <th>Kategorie</th>
+                    <th>Cena prodejní</th>
+                    <th>Stav</th>
+                </tr>
+            </thead>
+            <tbody id="productTableBody">
+                <!-- Ukázková data (v reálu generována JS) -->
+                <tr class="selected">
+                    <td><input type="checkbox" checked></td>
+                    <td><strong>Vitamin C 1000 mg Imuno</strong></td>
+                    <td>8594059734521</td>
+                    <td>Pharmavit</td>
+                    <td>Vitamíny</td>
+                    <td>189 Kč</td>
+                    <td><span class="badge badge-green">Připraven</span></td>
+                </tr>
+                <tr class="selected">
+                    <td><input type="checkbox" checked></td>
+                    <td><strong>Magnesium B6 tbl. 90</strong></td>
+                    <td>8594059734538</td>
+                    <td>Pharmavit</td>
+                    <td>Minerály</td>
+                    <td>219 Kč</td>
+                    <td><span class="badge badge-orange">Chybí kategorie</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox"></td>
+                    <td><strong>Protein Whey 80 vanilka</strong></td>
+                    <td></td>
+                    <td>GreenFood</td>
+                    <td>Proteiny</td>
+                    <td>599 Kč</td>
+                    <td><span class="badge badge-red">Chybí EAN</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox"></td>
+                    <td><strong>Omega 3 Forte 60 cps</strong></td>
+                    <td>8594059734545</td>
+                    <td>Biomin</td>
+                    <td>Tuky a oleje</td>
+                    <td>349 Kč</td>
+                    <td><span class="badge badge-green">Připraven</span></td>
+                </tr>
+                <tr>
+                    <td><input type="checkbox"></td>
+                    <td><strong>Zinek chelát 25 mg</strong></td>
+                    <td>8594059734552</td>
+                    <td>Biomin</td>
+                    <td>Minerály</td>
+                    <td>129 Kč</td>
+                    <td><span class="badge badge-green">Připraven</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="select-info">
+        Vybráno: <strong id="selectedCount">2</strong> přípravků
+        z celkem <strong>5</strong> (2 připraveny, 1 s varováním, 2 nevybrány)
+    </div>
+
+    <div class="actions">
+        <button class="btn btn-secondary" onclick="goStep(2)">← Zpět</button>
+        <button class="btn btn-primary" onclick="goStep(4)">Kontrola vybraných →</button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     STEP 4 – Kontrola a uložení
+══════════════════════════════════════════ -->
+<div id="step4" class="card hidden">
+    <h2>Kontrola a uložení</h2>
+    <p class="subtitle">Zkontrolujte a doplňte chybějící údaje. Poté uložte do databáze.</p>
+
+    <!-- Souhrnná čísla -->
+    <div class="summary-bar">
+        <div class="summary-stat"><div class="val">2</div><div class="lbl">Vybrané přípravky</div></div>
+        <div class="summary-stat"><div class="val" style="color:#27ae60">1</div><div class="lbl">Připraveny</div></div>
+        <div class="summary-stat"><div class="val" style="color:#e67e22">1</div><div class="lbl">Vyžaduje doplnění</div></div>
+        <div class="summary-stat"><div class="val" style="color:#e74c3c">0</div><div class="lbl">Kritické chyby</div></div>
+    </div>
+
+    <div class="review-list">
+
+        <!-- Přípravek 1 – OK -->
+        <div class="review-item">
+            <div class="review-item-header" onclick="toggleReviewItem(this)">
+                <span class="badge badge-green">✓ Připraven</span>
+                <span class="item-name">Vitamin C 1000 mg Imuno</span>
+                <span style="font-size:.8rem;color:#999">EAN 8594059734521</span>
+                <span style="color:#999;margin-left:auto">▼</span>
+            </div>
+            <div class="review-item-body">
+                <div class="field-group">
+                    <label>Název *</label>
+                    <input type="text" class="prefilled" value="Vitamin C 1000 mg Imuno">
+                </div>
+                <div class="field-group">
+                    <label>Výrobce</label>
+                    <input type="text" class="prefilled" value="Pharmavit">
+                </div>
+                <div class="field-group full">
+                    <label>Popis</label>
+                    <textarea class="prefilled">Výživový doplněk s vitaminem C 1000 mg pro podporu imunitního systému. 60 tablet.</textarea>
+                </div>
+                <div class="field-group">
+                    <label>Kategorie *</label>
+                    <select class="prefilled" style="width:100%;padding:7px 10px;border:1px solid #a5d6a7;border-radius:5px;background:#f0fff4">
+                        <option>Vitamíny</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label>EAN</label>
+                    <input type="text" class="prefilled" value="8594059734521">
+                </div>
+                <div class="field-group">
+                    <label>Cena nákupní *</label>
+                    <input type="number" value="95">
+                </div>
+                <div class="field-group">
+                    <label>Cena prodejní *</label>
+                    <input type="number" class="prefilled" value="189">
+                </div>
+            </div>
+        </div>
+
+        <!-- Přípravek 2 – chybí kategorie -->
+        <div class="review-item">
+            <div class="review-item-header" onclick="toggleReviewItem(this)">
+                <span class="badge badge-orange">⚠ Doplnit</span>
+                <span class="item-name">Magnesium B6 tbl. 90</span>
+                <span style="font-size:.8rem;color:#999">EAN 8594059734538</span>
+                <span style="color:#999;margin-left:auto">▼</span>
+            </div>
+            <div class="review-item-body">
+                <div class="field-group">
+                    <label>Název *</label>
+                    <input type="text" class="prefilled" value="Magnesium B6 tbl. 90">
+                </div>
+                <div class="field-group">
+                    <label>Výrobce</label>
+                    <input type="text" class="prefilled" value="Pharmavit">
+                </div>
+                <div class="field-group full">
+                    <label>Popis</label>
+                    <textarea class="prefilled">Hořčík s vitamínem B6 pro správnou funkci nervové soustavy. 90 tablet.</textarea>
+                </div>
+                <div class="field-group">
+                    <label>Kategorie *</label>
+                    <select class="missing" style="width:100%;padding:7px 10px;border:1px solid #e74c3c;border-radius:5px;background:#fff5f5">
+                        <option value="">– vyberte kategorii –</option>
+                        <option>Vitamíny</option>
+                        <option>Minerály</option>
+                        <option>Proteiny</option>
+                    </select>
+                    <div class="validation-msg">Kategorie je povinná</div>
+                </div>
+                <div class="field-group">
+                    <label>EAN</label>
+                    <input type="text" class="prefilled" value="8594059734538">
+                </div>
+                <div class="field-group">
+                    <label>Cena nákupní *</label>
+                    <input type="number" placeholder="doplňte…" class="missing">
+                    <div class="validation-msg">Cena nákupní je povinná</div>
+                </div>
+                <div class="field-group">
+                    <label>Cena prodejní *</label>
+                    <input type="number" class="prefilled" value="219">
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /review-list -->
+
+    <div class="actions">
+        <button class="btn btn-secondary" onclick="goStep(3)">← Zpět</button>
+        <button class="btn btn-secondary">📋 Export CSV</button>
+        <button class="btn btn-success" id="btnSave">
+            💾 Uložit do databáze (2 přípravky)
+        </button>
+    </div>
+</div>
+
+</main>
+
+<script>
+/* ── Navigace mezi kroky ── */
+function goStep(n) {
+    for (let i = 1; i <= 4; i++) {
+        document.getElementById('step' + i).classList.add('hidden');
+    }
+    document.getElementById('step' + n).classList.remove('hidden');
+
+    document.querySelectorAll('.step').forEach(el => {
+        const s = parseInt(el.dataset.step);
+        el.classList.remove('active', 'done');
+        if (s === n) el.classList.add('active');
+        if (s < n)  el.classList.add('done');
+    });
+    window.scrollTo(0, 0);
+}
+
+/* ── Step 1 – upload & detekce polí ── */
+const DEMO_FIELDS = ['PRODUCT_NAME','DESCRIPTION','MANUFACTURER','EAN','PRICE','IMGURL','URL','CATEGORYTEXT'];
+const DEMO_PRODUCTS = [
+    { PRODUCT_NAME:'Vitamin C 1000 mg Imuno', EAN:'8594059734521', MANUFACTURER:'Pharmavit', PRICE:'189', CATEGORYTEXT:'Vitamíny' },
+    { PRODUCT_NAME:'Magnesium B6 tbl. 90',   EAN:'8594059734538', MANUFACTURER:'Pharmavit', PRICE:'219', CATEGORYTEXT:'' },
+    { PRODUCT_NAME:'Protein Whey 80 vanilka', EAN:'',             MANUFACTURER:'GreenFood', PRICE:'599', CATEGORYTEXT:'Proteiny' },
+];
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    handleFile(e.target.files[0]);
+});
+
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+    if (!file) return;
+
+    // Simulace detekce (v reálu: skutečný parsing)
+    const count = Math.floor(Math.random() * 900) + 100;
+    document.getElementById('fileInfoText').textContent =
+        file.name + ' – ' + count + ' přípravků nalezeno';
+    document.getElementById('fileInfo').classList.add('show');
+    document.getElementById('btn1Next').disabled = false;
+
+    // Detekovaná pole
+    const fieldsEl = document.getElementById('detectedFields');
+    fieldsEl.innerHTML = '';
+    DEMO_FIELDS.forEach(f => {
+        const p = document.createElement('div');
+        p.className = 'pill';
+        p.textContent = f;
+        fieldsEl.appendChild(p);
+    });
+
+    // Náhled tabulky
+    const head = document.getElementById('previewHead');
+    head.innerHTML = '';
+    const cols = Object.keys(DEMO_PRODUCTS[0]);
+    cols.forEach(c => { const th = document.createElement('th'); th.textContent = c; head.appendChild(th); });
+
+    const body = document.getElementById('previewBody');
+    body.innerHTML = '';
+    DEMO_PRODUCTS.forEach(p => {
+        const tr = document.createElement('tr');
+        cols.forEach(c => {
+            const td = document.createElement('td');
+            td.textContent = p[c] || '–';
+            tr.appendChild(td);
+        });
+        body.appendChild(tr);
+    });
+
+    document.getElementById('feedPreview').classList.remove('hidden');
+}
+
+/* ── Step 3 – select all toggle ── */
+let allSelected = false;
+function toggleSelectAll() {
+    allSelected = !allSelected;
+    document.querySelectorAll('#productTableBody input[type=checkbox]').forEach(c => {
+        c.checked = allSelected;
+        c.closest('tr').classList.toggle('selected', allSelected);
+    });
+    updateSelectedCount();
+}
+
+document.addEventListener('change', function(e) {
+    if (e.target.matches('#productTableBody input[type=checkbox]')) {
+        e.target.closest('tr').classList.toggle('selected', e.target.checked);
+        updateSelectedCount();
+    }
+});
+
+function updateSelectedCount() {
+    const n = document.querySelectorAll('#productTableBody input[type=checkbox]:checked').length;
+    document.getElementById('selectedCount').textContent = n;
+}
+
+/* ── Step 4 – toggle položky ── */
+function toggleReviewItem(header) {
+    const body = header.nextElementSibling;
+    body.style.display = body.style.display === 'none' ? '' : 'none';
+    const arrow = header.querySelector('span:last-child');
+    arrow.textContent = body.style.display === 'none' ? '▶' : '▼';
+}
+</script>
+</body>
+</html>
