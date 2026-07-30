@@ -1,0 +1,6 @@
+node_modules/
+loga/
+debug/
+vyrobci.json
+vyrobci.csv
+package-lock.json

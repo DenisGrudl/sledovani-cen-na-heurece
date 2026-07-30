@@ -1,0 +1,17 @@
+{
+  "name": "vitalita-vyrobci-scraper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scraper výrobců/značek z vitalita.cz/znacka/ – popis, logo, adresa (ARES)",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node scrape.js",
+    "test": "node scrape.js --limit 5"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
